@@ -1,0 +1,260 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Bank Transaction Analyzer</title>
+    <link rel="stylesheet" href="css/style.css">
+</head>
+<body>
+
+    <!-- Sidebar Navigation -->
+    <aside class="sidebar">
+        <div class="brand-header">
+            <h2>🏦 Bank Analyzer</h2>
+        </div>
+
+        <ul class="nav-list">
+            <li class="nav-item active" data-view="viewDashboard">
+                <span>📊</span> Dashboard
+            </li>
+            <li class="nav-item" data-view="viewAdd">
+                <span>➕</span> Add Transaction
+            </li>
+            <li class="nav-item" data-view="viewHistory">
+                <span>📑</span> Transaction History
+            </li>
+            <li class="nav-item" data-view="viewAnalytics">
+                <span>📈</span> Category Analytics
+            </li>
+        </ul>
+
+        <div class="sidebar-footer">
+            <button id="btnResetData" class="btn-reset-data">🔄 Reset Sample Data</button>
+        </div>
+    </aside>
+
+    <!-- Main Content Area -->
+    <main class="main-content">
+
+        <!-- VIEW 1: Dashboard -->
+        <section id="viewDashboard" class="view-panel active">
+            <div class="page-header">
+                <h1>Financial Dashboard</h1>
+                <p>Real-time overview of income, expenses, and account balance.</p>
+            </div>
+
+            <div class="cards-grid">
+                <div class="metric-card balance">
+                    <div class="metric-title">Total Balance</div>
+                    <div id="lblBalance" class="metric-value">₹0.00</div>
+                    <div class="metric-sub">Current Net Account Balance</div>
+                </div>
+                <div class="metric-card income">
+                    <div class="metric-title">Total Income</div>
+                    <div id="lblIncome" class="metric-value">₹0.00</div>
+                    <div class="metric-sub">Sum of incoming credits</div>
+                </div>
+                <div class="metric-card expense">
+                    <div class="metric-title">Total Expenses</div>
+                    <div id="lblExpense" class="metric-value">₹0.00</div>
+                    <div class="metric-sub">Sum of outgoing spends</div>
+                </div>
+                <div class="metric-card count">
+                    <div class="metric-title">Total Transactions</div>
+                    <div id="lblCount" class="metric-value">0</div>
+                    <div class="metric-sub">Total transaction count</div>
+                </div>
+                <div class="metric-card highest">
+                    <div class="metric-title">Highest Transaction</div>
+                    <div id="lblHighest" class="metric-value">₹0.00</div>
+                    <div class="metric-sub">Highest single transaction</div>
+                </div>
+                <div class="metric-card lowest">
+                    <div class="metric-title">Lowest Transaction</div>
+                    <div id="lblLowest" class="metric-value">₹0.00</div>
+                    <div class="metric-sub">Lowest single transaction</div>
+                </div>
+            </div>
+
+            <div class="dashboard-split">
+                <div class="dashboard-card">
+                    <h3>Recently Added Transactions</h3>
+                    <div class="table-container">
+                        <table class="styled-table">
+                            <thead>
+                                <tr>
+                                    <th>ID</th>
+                                    <th>Date</th>
+                                    <th>Description</th>
+                                    <th>Type</th>
+                                    <th>Amount</th>
+                                </tr>
+                            </thead>
+                            <tbody id="tbodyQueue">
+                                <!-- Dynamic queue rows -->
+                            </tbody>
+                        </table>
+                    </div>
+                </div>
+
+                <div class="dashboard-card">
+                    <h3>Financial Highlights</h3>
+                    <p id="lblHighInc" style="font-weight: bold; color: var(--color-income); margin-bottom: 16px; font-size: 14px;">Highest Income: N/A</p>
+                    <p id="lblHighExp" style="font-weight: bold; color: var(--color-expense); margin-bottom: 16px; font-size: 14px;">Highest Expense: N/A</p>
+                </div>
+            </div>
+        </section>
+
+        <!-- VIEW 2: Add Transaction -->
+        <section id="viewAdd" class="view-panel">
+            <div class="page-header">
+                <h1>Add New Transaction</h1>
+                <p>Fill out the form below to add a new transaction.</p>
+            </div>
+
+            <div class="form-card">
+                <form id="formAdd">
+                    <div class="form-group">
+                        <label>Transaction ID: *</label>
+                        <div class="input-row">
+                            <input type="text" id="txtId" class="form-control" required placeholder="e.g. TX119">
+                            <button type="button" id="btnAutoId" class="btn-auto-id">Auto ID</button>
+                        </div>
+                    </div>
+
+                    <div class="form-group">
+                        <label>Date (YYYY-MM-DD): *</label>
+                        <input type="date" id="txtDate" class="form-control" required>
+                    </div>
+
+                    <div class="form-group">
+                        <label>Transaction Type: *</label>
+                        <select id="cbType" class="form-control">
+                            <option value="Expense">Expense</option>
+                            <option value="Income">Income</option>
+                        </select>
+                    </div>
+
+                    <div class="form-group">
+                        <label>Category: *</label>
+                        <select id="cbCategory" class="form-control">
+                            <option value="Food">Food</option>
+                            <option value="Shopping">Shopping</option>
+                            <option value="Travel">Travel</option>
+                            <option value="Education">Education</option>
+                            <option value="Bills">Bills</option>
+                            <option value="Salary">Salary</option>
+                            <option value="Entertainment">Entertainment</option>
+                            <option value="Other">Other</option>
+                        </select>
+                    </div>
+
+                    <div class="form-group">
+                        <label>Description: *</label>
+                        <input type="text" id="txtDesc" class="form-control" required placeholder="e.g. Grocery store spend">
+                    </div>
+
+                    <div class="form-group">
+                        <label>Amount (₹): *</label>
+                        <input type="number" step="0.01" id="txtAmount" class="form-control" required placeholder="e.g. 1500">
+                    </div>
+
+                    <div style="display: flex; gap: 12px; margin-top: 24px;">
+                        <button type="submit" class="btn-primary">Add Transaction</button>
+                        <button type="reset" class="btn-secondary">Reset Form</button>
+                    </div>
+
+                    <div id="toastMsg" class="toast-msg"></div>
+                </form>
+            </div>
+        </section>
+
+        <!-- VIEW 3: Transaction History -->
+        <section id="viewHistory" class="view-panel">
+            <div class="page-header">
+                <h1>Transaction History</h1>
+                <p>Complete ledger of all recorded income and expense transactions.</p>
+            </div>
+
+            <div class="dashboard-card">
+                <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 16px;">
+                    <span id="lblHistoryCount" style="font-size: 13px; font-weight: bold; color: var(--text-muted);">Total Transactions: 0</span>
+                    <div style="display: flex; gap: 10px;">
+                        <button id="btnExportCSV" class="btn-secondary">📥 Export CSV</button>
+                        <button id="btnRefreshHistory" class="btn-secondary">🔄 Refresh</button>
+                    </div>
+                </div>
+
+                <div class="table-container">
+                    <table class="styled-table">
+                        <thead>
+                            <tr>
+                                <th>ID</th>
+                                <th>Date</th>
+                                <th>Description</th>
+                                <th>Type</th>
+                                <th>Category</th>
+                                <th style="text-align: right;">Amount</th>
+                                <th style="text-align: center;">Actions</th>
+                            </tr>
+                        </thead>
+                        <tbody id="tbodyHistory">
+                            <!-- Dynamic history rows -->
+                        </tbody>
+                    </table>
+                </div>
+            </div>
+        </section>
+
+        <!-- VIEW 4: Category Analytics -->
+        <section id="viewAnalytics" class="view-panel">
+            <div class="page-header">
+                <h1>Category Expense Analytics</h1>
+                <p>Expense distribution and category breakdown.</p>
+            </div>
+
+            <div class="analytics-split">
+                <!-- Category Table Card -->
+                <div class="dashboard-card">
+                    <h3>Category Breakdown Table</h3>
+                    <div class="table-container">
+                        <table class="styled-table">
+                            <thead>
+                                <tr>
+                                    <th>Category</th>
+                                    <th>Total Spent (₹)</th>
+                                    <th>% of Expenses</th>
+                                </tr>
+                            </thead>
+                            <tbody id="tbodyCategory">
+                                <!-- Dynamic category rows -->
+                            </tbody>
+                        </table>
+                    </div>
+                    <div style="margin-top: 16px; border-top: 1px solid var(--card-border); padding-top: 12px;">
+                        <p id="lblTopCategory" style="font-weight: bold; color: var(--color-expense); margin-bottom: 4px;">Highest Spending Category: N/A</p>
+                        <p id="lblTotalExpenseSummary" style="font-size: 13px; font-weight: bold; color: var(--text-primary);">Total Aggregated Expenses: ₹0.00</p>
+                    </div>
+                </div>
+
+                <!-- Custom Bar Chart Card -->
+                <div class="dashboard-card">
+                    <h3>Expense Distribution Bar Chart</h3>
+                    <div class="chart-container">
+                        <div id="barChartWrapper" class="bars-wrapper">
+                            <!-- Dynamic HTML Bars -->
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </section>
+
+    </main>
+
+    <!-- JS Scripts -->
+    <script src="js/storage.js"></script>
+    <script src="js/dsa.js"></script>
+    <script src="js/app.js"></script>
+</body>
+</html>
