@@ -1,7 +1,7 @@
 /**
  * Financial Insights Engine.
- * Calculates savings rate, monthly income/expense breakdowns, highest spending day/category,
- * and generates deterministic financial health alerts.
+ * Calculates savings rate, monthly income/expense breakdowns, highest/lowest transactions,
+ * highest spending day/category, and generates deterministic financial health alerts.
  */
 class InsightsEngine {
 
@@ -12,6 +12,9 @@ class InsightsEngine {
         let totalIncome = 0;
         let totalExpense = 0;
 
+        let maxTx = null;
+        let minTx = null;
+
         const categoryExpenses = {};
         const dailyExpenses = {};
         const monthlySummary = {}; // { "2026-08": { income: 0, expense: 0 } }
@@ -19,8 +22,12 @@ class InsightsEngine {
         for (let i = 0; i < transactions.length; i++) {
             const tx = transactions[i];
             const amount = parseFloat(tx.amount) || 0;
-            const dateStr = tx.date; // YYYY-MM-DD
+            const dateStr = tx.date;
             const monthStr = dateStr ? dateStr.substring(0, 7) : 'Unknown';
+
+            // Track highest and lowest transaction overall
+            if (!maxTx || amount > maxTx.amount) maxTx = tx;
+            if (!minTx || amount < minTx.amount) minTx = tx;
 
             if (!monthlySummary[monthStr]) {
                 monthlySummary[monthStr] = { income: 0, expense: 0 };
@@ -71,6 +78,8 @@ class InsightsEngine {
             totalExpense,
             netBalance,
             savingsRate: +savingsRate.toFixed(1),
+            highestTransaction: maxTx,
+            lowestTransaction: minTx,
             categoryExpenses,
             dailyExpenses,
             monthlySummary,

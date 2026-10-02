@@ -37,8 +37,7 @@ class TransactionRepository {
         try {
             const raw = JSON.parse(stored);
             const clean = TransactionValidator.sanitizeArray(raw);
-            if (clean.length === 0 && raw.length > 0) {
-                // If all raw entries failed sanitation, fall back to defaults
+            if (clean.length === 0) {
                 const defaults = TransactionRepository.getDefaultTransactions();
                 TransactionRepository.saveAll(defaults);
                 return defaults;
