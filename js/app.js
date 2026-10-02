@@ -1,11 +1,17 @@
 /**
- * Main Application UI Logic & Event Handlers
+ * Central Controller & DOM Manager.
+ * Orchestrates Clean Architecture layers:
+ * 1. Storage Repository & Validator
+ * 2. DSA Engines (Circular Queue, Multi-Predicate Search, Complexity-Aware Sorting)
+ * 3. Analytics & Budget Engine
+ * 4. AI Financial Assistant
+ * 5. Unit Test Suite Runner
  */
 document.addEventListener('DOMContentLoaded', () => {
 
-    // --- State Variables ---
-    let transactions = StorageManager.loadTransactions();
-    const recentQueue = new RecentQueue(5);
+    // --- State & Storage Initialization ---
+    let transactions = TransactionRepository.loadAll();
+    const recentQueue = new CircularQueue(5);
 
     function syncRecentQueue() {
         recentQueue.clear();
@@ -30,13 +36,11 @@ document.addEventListener('DOMContentLoaded', () => {
     const lblBalance = document.getElementById('lblBalance');
     const lblIncome = document.getElementById('lblIncome');
     const lblExpense = document.getElementById('lblExpense');
-    const lblCount = document.getElementById('lblCount');
+    const lblSavingsRate = document.getElementById('lblSavingsRate');
     const lblHighest = document.getElementById('lblHighest');
     const lblLowest = document.getElementById('lblLowest');
-    const lblHighInc = document.getElementById('lblHighInc');
-    const lblHighExp = document.getElementById('lblHighExp');
 
-    // Queue Table Body
+    const containerAlerts = document.getElementById('containerAlerts');
     const tbodyQueue = document.getElementById('tbodyQueue');
 
     // Add Form Elements
@@ -50,21 +54,56 @@ document.addEventListener('DOMContentLoaded', () => {
     const btnAutoId = document.getElementById('btnAutoId');
     const toastMsg = document.getElementById('toastMsg');
 
-    // History Table Elements
+    // History Elements
     const tbodyHistory = document.getElementById('tbodyHistory');
     const lblHistoryCount = document.getElementById('lblHistoryCount');
     const btnExportCSV = document.getElementById('btnExportCSV');
     const btnRefreshHistory = document.getElementById('btnRefreshHistory');
+
+    // Advanced Search & Sort Elements
+    const cbSearchField = document.getElementById('cbSearchField');
+    const txtSearchQuery = document.getElementById('txtSearchQuery');
+    const txtStartDate = document.getElementById('txtStartDate');
+    const txtEndDate = document.getElementById('txtEndDate');
+    const txtMinAmount = document.getElementById('txtMinAmount');
+    const txtMaxAmount = document.getElementById('txtMaxAmount');
+    const cbSearchType = document.getElementById('cbSearchType');
+    const cbSearchCategory = document.getElementById('cbSearchCategory');
+    const btnRunSearch = document.getElementById('btnRunSearch');
+    const btnResetSearch = document.getElementById('btnResetSearch');
+
+    const cbSortAlgorithm = document.getElementById('cbSortAlgorithm');
+    const cbSortField = document.getElementById('cbSortField');
+    const cbSortOrder = document.getElementById('cbSortOrder');
+    const btnRunSort = document.getElementById('btnRunSort');
+
+    const lblAlgoMeta = document.getElementById('lblAlgoMeta');
+    const badgeComplexity = document.getElementById('badgeComplexity');
+    const tbodyDsaResults = document.getElementById('tbodyDsaResults');
 
     // Analytics Elements
     const tbodyCategory = document.getElementById('tbodyCategory');
     const lblTopCategory = document.getElementById('lblTopCategory');
     const lblTotalExpenseSummary = document.getElementById('lblTotalExpenseSummary');
     const barChartWrapper = document.getElementById('barChartWrapper');
+    const containerBudgets = document.getElementById('containerBudgets');
+
+    // AI Assistant Elements
+    const aiHeadline = document.getElementById('aiHeadline');
+    const aiSummary = document.getElementById('aiSummary');
+    const aiActionList = document.getElementById('aiActionList');
+    const txtAiQuery = document.getElementById('txtAiQuery');
+    const btnAskAi = document.getElementById('btnAskAi');
+    const aiQueryResponse = document.getElementById('aiQueryResponse');
+
+    // Unit Test Elements
+    const btnRunTests = document.getElementById('btnRunTests');
+    const testResultsSummary = document.getElementById('testResultsSummary');
+    const tbodyTestResults = document.getElementById('tbodyTestResults');
 
     const btnResetData = document.getElementById('btnResetData');
 
-    // --- Navigation Handlers ---
+    // --- Navigation ---
     navItems.forEach(item => {
         item.addEventListener('click', () => {
             const targetView = item.getAttribute('data-view');
@@ -79,61 +118,43 @@ document.addEventListener('DOMContentLoaded', () => {
         });
     });
 
-    // --- Auto Generate Transaction ID ---
+    // --- Auto Generate ID ---
     function generateAutoId() {
-        const nextId = "TX" + (transactions.length + 101);
-        txtId.value = nextId;
+        if (txtId) txtId.value = TransactionValidator.generateUniqueId(transactions);
     }
     if (btnAutoId) btnAutoId.addEventListener('click', generateAutoId);
-
-    // Set today date as default
     if (txtDate) txtDate.value = new Date().toISOString().split('T')[0];
     generateAutoId();
 
-    // --- Add Transaction Form Submission ---
+    // --- Add Form Submission ---
     if (formAdd) {
         formAdd.addEventListener('submit', (e) => {
             e.preventDefault();
 
-            const id = txtId.value.trim();
-            const date = txtDate.value.trim();
-            const description = txtDesc.value.trim();
-            const type = cbType.value;
-            const category = cbCategory.value;
-            const amountStr = txtAmount.value.trim();
+            const candidateTx = {
+                id: txtId.value.trim(),
+                date: txtDate.value.trim(),
+                description: txtDesc.value.trim(),
+                type: cbType.value,
+                category: cbCategory.value,
+                amount: txtAmount.value.trim()
+            };
 
-            if (!id) {
-                showToast("Transaction ID cannot be empty.", "error");
-                txtId.focus();
+            // Schema validation
+            const val = TransactionValidator.validate(candidateTx, transactions);
+            if (!val.isValid) {
+                showToast(val.errors.join(' | '), 'error');
                 return;
             }
 
-            if (transactions.some(t => t.id.toLowerCase() === id.toLowerCase())) {
-                showToast(`Transaction ID '${id}' already exists. Please use a unique ID.`, "error");
-                return;
-            }
+            candidateTx.amount = parseFloat(candidateTx.amount);
 
-            if (!description) {
-                showToast("Description cannot be empty.", "error");
-                txtDesc.focus();
-                return;
-            }
+            transactions.push(candidateTx);
+            recentQueue.enqueue(candidateTx);
 
-            const amount = parseFloat(amountStr);
-            if (isNaN(amount) || amount <= 0) {
-                showToast("Amount must be a valid number greater than 0.", "error");
-                txtAmount.focus();
-                return;
-            }
+            transactions = TransactionRepository.saveAll(transactions);
 
-            const newTx = { id, date, description, type, category, amount };
-
-            transactions.push(newTx);
-            recentQueue.enqueue(newTx);
-
-            StorageManager.saveTransactions(transactions);
-
-            showToast(`Success: Transaction ${id} added successfully!`, "success");
+            showToast(`Success: Transaction ${candidateTx.id} added!`, 'success');
 
             txtDesc.value = '';
             txtAmount.value = '';
@@ -150,21 +171,21 @@ document.addEventListener('DOMContentLoaded', () => {
         toastMsg.className = 'toast-msg ' + (type === 'success' ? 'toast-success' : 'toast-error');
     }
 
-    // --- Delete Transaction Handler ---
+    // --- Delete Transaction ---
     window.deleteTransaction = function(id) {
         if (confirm(`Are you sure you want to delete transaction '${id}'?`)) {
             transactions = transactions.filter(t => t.id !== id);
             syncRecentQueue();
-            StorageManager.saveTransactions(transactions);
+            transactions = TransactionRepository.saveAll(transactions);
             updateAllViews();
         }
     };
 
-    // Reset Data
+    // --- Reset Data ---
     if (btnResetData) {
         btnResetData.addEventListener('click', () => {
-            if (confirm("Reset transaction dataset to initial 18 sample records?")) {
-                transactions = StorageManager.resetToDefault();
+            if (confirm("Reset transaction dataset to initial sample records?")) {
+                transactions = TransactionRepository.resetToDefaults();
                 syncRecentQueue();
                 updateAllViews();
                 alert("Dataset reset to defaults!");
@@ -172,42 +193,141 @@ document.addEventListener('DOMContentLoaded', () => {
         });
     }
 
-    // CSV Export
-    if (btnExportCSV) {
-        btnExportCSV.addEventListener('click', () => {
-            StorageManager.exportCSV(transactions);
+    // Export CSV
+    if (btnExportCSV) btnExportCSV.addEventListener('click', () => TransactionRepository.exportCSV(transactions));
+    if (btnRefreshHistory) btnRefreshHistory.addEventListener('click', updateAllViews);
+
+    // --- Search Logic ---
+    if (btnRunSearch) btnRunSearch.addEventListener('click', performSearch);
+    function performSearch() {
+        const filters = {
+            query: txtSearchQuery.value,
+            field: cbSearchField.value,
+            startDate: txtStartDate.value,
+            endDate: txtEndDate.value,
+            minAmount: txtMinAmount.value,
+            maxAmount: txtMaxAmount.value,
+            type: cbSearchType.value,
+            category: cbSearchCategory.value
+        };
+
+        const searchRes = SearchEngine.linearSearch(transactions, filters);
+        renderDsaTable(searchRes.results);
+
+        lblAlgoMeta.textContent = `Found ${searchRes.results.length} results (${searchRes.iterations} iterations scan, ${searchRes.timeMs}ms)`;
+        badgeComplexity.textContent = `Linear Search: O(n)`;
+    }
+
+    if (btnResetSearch) {
+        btnResetSearch.addEventListener('click', () => {
+            txtSearchQuery.value = '';
+            txtStartDate.value = '';
+            txtEndDate.value = '';
+            txtMinAmount.value = '';
+            txtMaxAmount.value = '';
+            cbSearchField.value = 'all';
+            cbSearchType.value = 'All';
+            cbSearchCategory.value = 'All';
+            renderDsaTable(transactions);
+            lblAlgoMeta.textContent = `Showing all ${transactions.length} records`;
+            badgeComplexity.textContent = `O(1) Access`;
         });
     }
 
-    if (btnRefreshHistory) {
-        btnRefreshHistory.addEventListener('click', () => {
-            updateAllViews();
+    // --- Sort Logic ---
+    if (btnRunSort) btnRunSort.addEventListener('click', performSort);
+    function performSort() {
+        const algo = cbSortAlgorithm.value;
+        const key = cbSortField.value;
+        const order = cbSortOrder.value;
+
+        let sortRes;
+        if (algo === 'bubble') {
+            sortRes = SortingEngine.bubbleSort(transactions, key, order);
+        } else if (algo === 'selection') {
+            sortRes = SortingEngine.selectionSort(transactions, key, order);
+        } else if (algo === 'merge') {
+            sortRes = SortingEngine.mergeSort(transactions, key, order);
+        } else if (algo === 'quick') {
+            sortRes = SortingEngine.quickSort(transactions, key, order);
+        }
+
+        renderDsaTable(sortRes.results);
+        lblAlgoMeta.textContent = `${sortRes.algorithm} on '${key}' (${order.toUpperCase()}) | ${sortRes.comparisons} comparisons, ${sortRes.swaps} swaps in ${sortRes.timeMs}ms`;
+        badgeComplexity.textContent = `${sortRes.algorithm}: ${sortRes.complexity}`;
+    }
+
+    // --- AI Assistant Interactive Q&A ---
+    if (btnAskAi) {
+        btnAskAi.addEventListener('click', () => {
+            const query = txtAiQuery.value.trim();
+            if (!query) return;
+            const answer = AIFinancialAssistant.answerQuery(query, transactions);
+            aiQueryResponse.style.display = 'block';
+            aiQueryResponse.innerHTML = answer;
         });
     }
 
-    // --- Core Update View Function ---
+    // --- Live Unit Tests Runner ---
+    if (btnRunTests) {
+        btnRunTests.addEventListener('click', runUnitTests);
+    }
+
+    function runUnitTests() {
+        const testRes = UnitTestRunner.runAllTests();
+
+        testResultsSummary.innerHTML = `
+            <div style="display: flex; gap: 15px; font-weight: bold; font-size: 14px;">
+                <span style="color: var(--color-income);">Passed: ${testRes.passed}/${testRes.total}</span>
+                <span style="color: var(--color-expense);">Failed: ${testRes.failed}</span>
+                <span style="color: var(--text-muted);">Time: ${testRes.executionTimeMs}ms</span>
+            </div>
+        `;
+
+        tbodyTestResults.innerHTML = '';
+        testRes.results.forEach((r, idx) => {
+            const tr = document.createElement('tr');
+            tr.innerHTML = `
+                <td><b>Test #${idx + 1}</b></td>
+                <td>${r.name}</td>
+                <td>
+                    <span class="badge ${r.status === 'PASS' ? 'badge-income' : 'badge-expense'}">${r.status}</span>
+                </td>
+            `;
+            tbodyTestResults.appendChild(tr);
+        });
+    }
+
+    // --- Core Master UI Refresh ---
     function updateAllViews() {
-        const stats = ArrayStatsEngine.calculateTotals(transactions);
-        if (lblBalance) lblBalance.textContent = currencyFormat.format(stats.balance);
-        if (lblIncome) lblIncome.textContent = currencyFormat.format(stats.income);
-        if (lblExpense) lblExpense.textContent = currencyFormat.format(stats.expenses);
-        if (lblCount) lblCount.textContent = stats.count;
+        const metrics = InsightsEngine.calculateMetrics(transactions);
+
+        if (lblBalance) lblBalance.textContent = currencyFormat.format(metrics.netBalance);
+        if (lblIncome) lblIncome.textContent = currencyFormat.format(metrics.totalIncome);
+        if (lblExpense) lblExpense.textContent = currencyFormat.format(metrics.totalExpense);
+        if (lblSavingsRate) lblSavingsRate.textContent = `${metrics.savingsRate}%`;
 
         const maxTx = ArrayStatsEngine.findHighestTransaction(transactions);
         const minTx = ArrayStatsEngine.findLowestTransaction(transactions);
-        const highInc = ArrayStatsEngine.findHighestIncome(transactions);
-        const highExp = ArrayStatsEngine.findHighestExpense(transactions);
 
         if (lblHighest) lblHighest.textContent = maxTx ? currencyFormat.format(maxTx.amount) : "₹0.00";
         if (lblLowest) lblLowest.textContent = minTx ? currencyFormat.format(minTx.amount) : "₹0.00";
 
-        if (lblHighInc) lblHighInc.textContent = highInc ? `Highest Income: ${currencyFormat.format(highInc.amount)} (${highInc.description})` : "Highest Income: None";
-        if (lblHighExp) lblHighExp.textContent = highExp ? `Highest Expense: ${currencyFormat.format(highExp.amount)} (${highExp.description})` : "Highest Expense: None";
+        // Render Financial Alerts
+        if (containerAlerts) {
+            containerAlerts.innerHTML = '';
+            metrics.alerts.forEach(a => {
+                const div = document.createElement('div');
+                div.className = `alert-box alert-${a.type}`;
+                div.innerHTML = `<strong>${a.title}</strong><br>${a.message}`;
+                containerAlerts.appendChild(div);
+            });
+        }
 
-        // Recent Queue Table
+        // Render Recent Queue Table (O(1) Ring Buffer)
         if (tbodyQueue) {
             tbodyQueue.innerHTML = '';
-            recentQueue.getItems().forEach(tx => {
+            recentQueue.toArray().forEach(tx => {
                 const tr = document.createElement('tr');
                 tr.innerHTML = `
                     <td><b>${tx.id}</b></td>
@@ -220,7 +340,7 @@ document.addEventListener('DOMContentLoaded', () => {
             });
         }
 
-        // Transaction History Table
+        // Render Transaction History
         if (tbodyHistory) {
             tbodyHistory.innerHTML = '';
             transactions.forEach(tx => {
@@ -241,17 +361,39 @@ document.addEventListener('DOMContentLoaded', () => {
         }
         if (lblHistoryCount) lblHistoryCount.textContent = `Showing ${transactions.length} total transactions`;
 
-        // Category Analytics
-        updateAnalyticsView(stats.expenses);
+        // Render Search/Sort Table
+        renderDsaTable(transactions);
+
+        // Render Category Analytics & Bar Chart
+        updateAnalyticsView(metrics);
+
+        // Render AI Executive Audit
+        updateAiView();
+
+        // Render Budget Tracker
+        updateBudgetView(metrics.categoryExpenses);
     }
 
-    function updateAnalyticsView(totalExpense) {
-        if (!tbodyCategory) return;
-        const hashMap = CategoryHashMapEngine.getCategoryWiseExpenses(transactions);
-        tbodyCategory.innerHTML = '';
+    function renderDsaTable(list) {
+        if (!tbodyDsaResults) return;
+        tbodyDsaResults.innerHTML = '';
+        list.forEach(tx => {
+            const tr = document.createElement('tr');
+            tr.innerHTML = `
+                <td><b>${tx.id}</b></td>
+                <td>${tx.date}</td>
+                <td>${tx.description}</td>
+                <td><span class="badge ${tx.type.toLowerCase() === 'income' ? 'badge-income' : 'badge-expense'}">${tx.type}</span></td>
+                <td>${tx.category}</td>
+                <td style="font-weight: bold; text-align: right;">${currencyFormat.format(tx.amount)}</td>
+            `;
+            tbodyDsaResults.appendChild(tr);
+        });
+    }
 
-        let topCat = 'None';
-        let maxVal = 0;
+    function updateAnalyticsView(metrics) {
+        if (!tbodyCategory) return;
+        tbodyCategory.innerHTML = '';
 
         const colors = [
             '#ef4444', '#f59e0b', '#0ea5e9', '#8b5cf6',
@@ -261,8 +403,8 @@ document.addEventListener('DOMContentLoaded', () => {
         if (barChartWrapper) barChartWrapper.innerHTML = '';
 
         let colorIdx = 0;
-        for (const [cat, val] of Object.entries(hashMap)) {
-            const pct = totalExpense > 0 ? (val / totalExpense) * 100 : 0;
+        for (const [cat, val] of Object.entries(metrics.categoryExpenses)) {
+            const pct = metrics.totalExpense > 0 ? (val / metrics.totalExpense) * 100 : 0;
 
             const tr = document.createElement('tr');
             tr.innerHTML = `
@@ -272,13 +414,8 @@ document.addEventListener('DOMContentLoaded', () => {
             `;
             tbodyCategory.appendChild(tr);
 
-            if (val > maxVal) {
-                maxVal = val;
-                topCat = cat;
-            }
-
             if (barChartWrapper) {
-                const barHeightPct = maxVal > 0 ? (val / Math.max(maxVal, 1)) * 100 : 0;
+                const barHeightPct = metrics.topCategoryAmount > 0 ? (val / metrics.topCategoryAmount) * 100 : 0;
                 const barCol = document.createElement('div');
                 barCol.className = 'bar-col';
                 barCol.innerHTML = `
@@ -291,10 +428,51 @@ document.addEventListener('DOMContentLoaded', () => {
             colorIdx++;
         }
 
-        if (lblTopCategory) lblTopCategory.textContent = `Highest Spending Category: ${topCat} (${currencyFormat.format(maxVal)})`;
-        if (lblTotalExpenseSummary) lblTotalExpenseSummary.textContent = `Total Aggregated Expenses: ${currencyFormat.format(totalExpense)}`;
+        if (lblTopCategory) lblTopCategory.textContent = `Highest Spending Category: ${metrics.topCategory} (${currencyFormat.format(metrics.topCategoryAmount)})`;
+        if (lblTotalExpenseSummary) lblTotalExpenseSummary.textContent = `Total Aggregated Expenses: ${currencyFormat.format(metrics.totalExpense)}`;
     }
 
-    // Initial Load
+    function updateAiView() {
+        if (!aiHeadline) return;
+        const audit = AIFinancialAssistant.generateExecutiveAudit(transactions);
+        aiHeadline.textContent = "🤖 AI Executive Financial Audit: " + audit.headline;
+        aiSummary.innerHTML = audit.summary;
+
+        aiActionList.innerHTML = '';
+        audit.actionItems.forEach(item => {
+            const li = document.createElement('li');
+            li.innerHTML = item;
+            aiActionList.appendChild(li);
+        });
+    }
+
+    function updateBudgetView(categoryExpenses) {
+        if (!containerBudgets) return;
+        const analysis = BudgetTracker.analyzeBudgets(categoryExpenses);
+        containerBudgets.innerHTML = '';
+
+        analysis.forEach(b => {
+            const itemDiv = document.createElement('div');
+            itemDiv.style.marginBottom = '14px';
+
+            const statusColor = b.isOverBudget ? '#ef4444' : (b.percentage >= 80 ? '#f59e0b' : '#10b981');
+
+            itemDiv.innerHTML = `
+                <div style="display: flex; justify-content: space-between; font-size: 13px; font-weight: bold; margin-bottom: 4px;">
+                    <span>${b.category}</span>
+                    <span>${currencyFormat.format(b.actualSpent)} / ${currencyFormat.format(b.budgetLimit)} (${b.percentage}%)</span>
+                </div>
+                <div class="progress-bar-container">
+                    <div class="progress-bar-fill" style="width: ${Math.min(100, b.percentage)}%; background-color: ${statusColor};"></div>
+                </div>
+            `;
+            containerBudgets.appendChild(itemDiv);
+        });
+    }
+
+    // Initial Master Refresh
     updateAllViews();
+
+    // Auto-run tests once on load
+    runUnitTests();
 });
